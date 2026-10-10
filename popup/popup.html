@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Betaflight助手</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="bf-plugin-container">
+
+    <div class="bf-plugin-header">
+      <h1 class="bf-plugin-title">Betaflight助手</h1>
+      <span class="bf-plugin-version">v1.0.0</span>
+    </div>
+
+    <div class="bf-plugin-tabs">
+      <button class="bf-plugin-tab active" data-tab="account">账户</button>
+      <button class="bf-plugin-tab" data-tab="aircraft">飞机</button>
+      <button class="bf-plugin-tab" data-tab="configs">配置</button>
+    </div>
+
+    <div class="bf-plugin-content">
+
+      <div class="bf-plugin-tab-content active" id="tab-account">
+        <div class="bf-plugin-section">
+          <div id="auth-panel">
+            <div class="bf-plugin-auth-tabs">
+              <button class="bf-plugin-auth-tab active" id="auth-tab-login">登录</button>
+              <button class="bf-plugin-auth-tab" id="auth-tab-register">注册</button>
+            </div>
+
+            <div class="bf-plugin-auth-content active" id="auth-content-login">
+              <div class="bf-plugin-form-group">
+                <label class="bf-plugin-label">手机号</label>
+                <input type="tel" id="login-phone" class="bf-plugin-input" placeholder="请输入手机号">
+              </div>
+              <div class="bf-plugin-form-group">
+                <label class="bf-plugin-label">密码</label>
+                <input type="password" id="login-password" class="bf-plugin-input" placeholder="请输入密码">
+              </div>
+              <div class="bf-plugin-button-group">
+                <button class="bf-plugin-button primary" id="btn-login">登录</button>
+              </div>
+              <div class="bf-plugin-status" id="login-status"></div>
+            </div>
+
+            <div class="bf-plugin-auth-content" id="auth-content-register">
+              <div class="bf-plugin-form-group">
+                <label class="bf-plugin-label">手机号</label>
+                <input type="tel" id="register-phone" class="bf-plugin-input" placeholder="请输入手机号">
+              </div>
+              <div class="bf-plugin-form-group">
+                <label class="bf-plugin-label">昵称</label>
+                <input type="text" id="register-nickname" class="bf-plugin-input" placeholder="请输入昵称">
+              </div>
+              <div class="bf-plugin-form-group">
+                <label class="bf-plugin-label">密码</label>
+                <input type="password" id="register-password" class="bf-plugin-input" placeholder="请输入密码">
+              </div>
+              <div class="bf-plugin-form-group">
+                <label class="bf-plugin-label">角色</label>
+                <select id="register-role" class="bf-plugin-input">
+                  <option value="pilot">飞手</option>
+                  <option value="coach">教练</option>
+                </select>
+              </div>
+              <div class="bf-plugin-button-group">
+                <button class="bf-plugin-button primary" id="btn-register">注册</button>
+              </div>
+              <div class="bf-plugin-status" id="register-status"></div>
+            </div>
+          </div>
+
+          <div id="profile-panel" style="display:none;">
+            <div class="bf-plugin-profile">
+              <div class="bf-plugin-profile-info">
+                <div class="bf-plugin-profile-field">
+                  <span class="bf-plugin-profile-label">手机号</span>
+                  <span class="bf-plugin-profile-value" id="profile-phone"></span>
+                </div>
+                <div class="bf-plugin-profile-field">
+                  <span class="bf-plugin-profile-label">昵称</span>
+                  <span class="bf-plugin-profile-value" id="profile-nickname"></span>
+                </div>
+                <div class="bf-plugin-profile-field">
+                  <span class="bf-plugin-profile-label">角色</span>
+                  <span class="bf-plugin-profile-value" id="profile-role"></span>
+                </div>
+              </div>
+              <div class="bf-plugin-button-group">
+                <button class="bf-plugin-button danger" id="btn-logout">退出登录</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bf-plugin-tab-content" id="tab-aircraft">
+        <div class="bf-plugin-section">
+          <!-- 飞机列表视图 -->
+          <div id="aircraft-view">
+            <h2 class="bf-plugin-section-title">飞机管理</h2>
+
+            <div class="bf-plugin-hangar-bar">
+              <label class="bf-plugin-label" for="hangar-switcher">所在机库</label>
+              <select id="hangar-switcher" class="bf-plugin-input"></select>
+              <button class="bf-plugin-button small" id="btn-new-hangar">新建机库</button>
+              <button class="bf-plugin-button small" id="btn-manage-hangars">管理</button>
+            </div>
+
+            <div class="bf-plugin-list-header">
+              <h3 class="bf-plugin-sub-title">飞机列表</h3>
+              <button class="bf-plugin-button primary small" id="btn-new-aircraft">新建飞机</button>
+            </div>
+            <div class="bf-plugin-status" id="aircraft-status"></div>
+            <div id="aircraft-list-container"></div>
+          </div>
+
+          <!-- 配置列表视图（点击飞机条目钻取进入） -->
+          <div id="config-view" style="display:none;">
+            <div class="bf-plugin-list-header">
+              <div class="bf-plugin-header-left">
+                <button class="bf-plugin-button small" id="btn-back-to-aircraft">← 返回</button>
+                <h3 class="bf-plugin-sub-title" id="config-aircraft-title">配置列表</h3>
+              </div>
+              <button class="bf-plugin-button primary small" id="btn-new-config">新建配置</button>
+            </div>
+            <div class="bf-plugin-status" id="config-status"></div>
+            <div id="config-list-container"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bf-plugin-tab-content" id="tab-configs">
+        <div class="bf-plugin-section">
+          <div id="config-records-view">
+            <h2 class="bf-plugin-section-title">配置记录管理</h2>
+            <div class="bf-plugin-status" id="config-records-status"></div>
+            <div id="config-records-container"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="bf-plugin-footer">
+      <button class="bf-plugin-button small" id="btn-export-data">导出数据</button>
+      <button class="bf-plugin-button small" id="btn-import-data">导入数据</button>
+      <button class="bf-plugin-button small danger" id="btn-clear-all">清除所有数据</button>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body

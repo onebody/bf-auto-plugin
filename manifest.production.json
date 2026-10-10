@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Betaflight助手",
+  "version": "1.0.0",
+  "description": "BetaFlight Web 学员自动化调参 Chrome 插件 - 支持学员管理、飞机配置、参数读写",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://app.betaflight.com/*"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://app.betaflight.com/*"
+      ],
+      "js": [
+        "content/content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/log-panel.js"
+      ],
+      "matches": [
+        "https://app.betaflight.com/*"
+      ]
+    }
+  ]
+}

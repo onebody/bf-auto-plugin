@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>参数编辑 - Betaflight助手</title>
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <div class="editor-container">
+
+    <header class="editor-header">
+      <div class="editor-header-info">
+        <h1 class="editor-title" id="editor-config-name">加载中...</h1>
+        <span class="editor-sub" id="editor-config-sub">配置记录参数编辑器</span>
+      </div>
+      <div class="editor-header-actions">
+        <button class="editor-button" id="btn-restore-draft" style="display:none;">恢复草稿</button>
+        <button class="editor-button" id="btn-discard-draft" style="display:none;">丢弃草稿</button>
+        <button class="editor-button" id="btn-save-local">保存到本地</button>
+        <button class="editor-button primary" id="btn-write-fc">写入飞控</button>
+      </div>
+    </header>
+
+    <div class="editor-status" id="editor-status" style="display:none;"></div>
+
+    <div class="editor-draft-banner" id="draft-banner" style="display:none;"></div>
+
+    <main class="editor-main">
+      <div class="editor-empty" id="editor-empty" style="display:none;">
+        <div class="editor-empty-icon">📭</div>
+        <p>该配置记录没有参数数据，无法编辑。</p>
+        <p class="editor-empty-hint">请先在插件「飞机」Tab 中钻取到飞机，通过「新建配置 → 读取参数」完成 CLI 导出。</p>
+      </div>
+
+      <div id="editor-sections"></div>
+
+      <details class="editor-raw" id="cli-raw-details">
+        <summary>CLI 原始参数（只读，仅供查阅；写入飞控时不生效）</summary>
+        <pre class="editor-raw-pre" id="cli-raw-pre"></pre>
+      </details>
+
+      <details class="editor-log" id="editor-log-details">
+        <summary>操作日志</summary>
+        <div class="editor-log-list" id="editor-log-list"></div>
+      </details>
+    </main>
+
+  </div>
+
+  <script type="module" src="editor.js"></script>
+</body>
+</html>

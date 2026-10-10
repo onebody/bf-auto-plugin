@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Betaflight助手 - 数据管理</title>
+  <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+  <div class="bf-admin-container">
+    <h1>Betaflight助手 - 数据管理</h1>
+
+    <div class="bf-admin-section">
+      <h2>数据概览</h2>
+      <div id="data-overview">
+        <div class="bf-admin-stat">
+          <span class="bf-admin-stat-label">账号:</span>
+          <span class="bf-admin-stat-value" id="stat-account">加载中...</span>
+        </div>
+        <div class="bf-admin-stat">
+          <span class="bf-admin-stat-label">学员:</span>
+          <span class="bf-admin-stat-value" id="stat-students">加载中...</span>
+        </div>
+        <div class="bf-admin-stat">
+          <span class="bf-admin-stat-label">飞机:</span>
+          <span class="bf-admin-stat-value" id="stat-aircrafts">加载中...</span>
+        </div>
+        <div class="bf-admin-stat">
+          <span class="bf-admin-stat-label">预设:</span>
+          <span class="bf-admin-stat-value" id="stat-presets">加载中...</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bf-admin-section">
+      <h2>数据操作</h2>
+      <div class="bf-admin-buttons">
+        <button class="bf-admin-button" id="btn-export-all">导出所有数据</button>
+        <button class="bf-admin-button" id="btn-import-data">导入数据</button>
+        <button class="bf-admin-button danger" id="btn-clear-all">清除所有数据</button>
+      </div>
+    </div>
+
+    <div class="bf-admin-section">
+      <h2>原始数据查看</h2>
+      <div class="bf-admin-tabs">
+        <button class="bf-admin-tab active" data-target="account-data">账号</button>
+        <button class="bf-admin-tab" data-target="students-data">学员</button>
+        <button class="bf-admin-tab" data-target="aircrafts-data">飞机</button>
+        <button class="bf-admin-tab" data-target="presets-data">预设</button>
+      </div>
+      <pre class="bf-admin-data" id="data-display">请选择要查看的数据类型</pre>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

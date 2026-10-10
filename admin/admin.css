@@ -1,0 +1,131 @@
+/**
+ * 管理页面样式
+ * @module admin/admin.css
+ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: #333;
+  background: #f5f5f5;
+  padding: 20px;
+}
+
+.bf-admin-container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+  font-size: 24px;
+  margin-bottom: 24px;
+  color: #4CAF50;
+}
+
+h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.bf-admin-section {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.bf-admin-section:last-child {
+  border-bottom: none;
+}
+
+/* 数据统计 */
+.bf-admin-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.bf-admin-stat-label {
+  font-weight: 600;
+  color: #666;
+}
+
+.bf-admin-stat-value {
+  color: #333;
+}
+
+/* 按钮 */
+.bf-admin-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.bf-admin-button {
+  padding: 10px 20px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s;
+}
+
+.bf-admin-button:hover {
+  background: #f5f5f5;
+}
+
+.bf-admin-button.danger {
+  background: #f44336;
+  color: white;
+  border-color: #f44336;
+}
+
+.bf-admin-button.danger:hover {
+  background: #d32f2f;
+}
+
+/* Tab 导航 */
+.bf-admin-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.bf-admin-tab {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.bf-admin-tab.active {
+  background: #4CAF50;
+  color: white;
+  border-color: #4CAF50;
+}
+
+/* 数据展示 */
+.bf-admin-data {
+  background: #f5f5f5;
+  padding: 16px;
+  border-radius: 4px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

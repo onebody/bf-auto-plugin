@@ -1,0 +1,242 @@
+/**
+ * 参数编辑器整页样式
+ * 视觉语言对齐 popup.css（主色 #3498db、圆角、卡片式分区）
+ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #f0f2f5;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.editor-container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+}
+
+/* ===== 顶栏 ===== */
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  margin-bottom: 14px;
+}
+
+.editor-title { font-size: 20px; font-weight: 600; }
+.editor-sub { font-size: 12px; color: #95a5a6; margin-top: 4px; display: block; }
+
+.editor-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ===== 按钮 ===== */
+.editor-button {
+  padding: 8px 16px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  background: #fff;
+  color: #2c3e50;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.editor-button:hover { border-color: #3498db; color: #3498db; }
+.editor-button.primary {
+  background: #3498db;
+  border-color: #3498db;
+  color: #fff;
+}
+.editor-button.primary:hover { background: #2e86d1; }
+.editor-button.danger {
+  background: #e74c3c;
+  border-color: #e74c3c;
+  color: #fff;
+}
+.editor-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ===== 状态条 / 草稿横幅 ===== */
+.editor-status {
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+.editor-status.success { background: #e8f8f0; color: #1e8e5a; border: 1px solid #b7e4cd; }
+.editor-status.error { background: #fdeceb; color: #c0392b; border: 1px solid #f5b7b1; }
+.editor-status.info { background: #eaf4fd; color: #2471a3; border: 1px solid #aed6f1; }
+
+.editor-draft-banner {
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 14px;
+  background: #fef9e7;
+  color: #9a7d0a;
+  border: 1px solid #f9e79f;
+  font-size: 13px;
+}
+
+/* ===== 主体 ===== */
+.editor-main { display: flex; flex-direction: column; gap: 14px; }
+
+.editor-empty {
+  background: #fff;
+  border-radius: 10px;
+  padding: 48px 20px;
+  text-align: center;
+  color: #7f8c8d;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.editor-empty-icon { font-size: 40px; margin-bottom: 12px; }
+.editor-empty-hint { font-size: 12px; color: #b0b8bc; margin-top: 8px; }
+
+/* ===== 参数分区表格 ===== */
+.editor-section {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.editor-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  padding-left: 8px;
+  border-left: 3px solid #3498db;
+}
+.editor-mode-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: #eaf4fd;
+  color: #2471a3;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.editor-table { width: 100%; border-collapse: collapse; }
+.editor-table th, .editor-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f0f2f5;
+  text-align: left;
+  vertical-align: middle;
+}
+.editor-table th {
+  font-size: 12px;
+  color: #95a5a6;
+  font-weight: normal;
+  background: #fafbfc;
+}
+.editor-table tr.axis-group td {
+  background: #f6f9fc;
+  font-weight: 600;
+  color: #34495e;
+  font-size: 13px;
+}
+.editor-table tr:nth-child(even):not(.axis-group) td { background: #fcfdfe; }
+
+.editor-param-name { font-weight: 500; white-space: nowrap; }
+.editor-param-cli { display: block; font-size: 11px; color: #aab4bd; font-family: monospace; margin-top: 2px; }
+
+.editor-param-input {
+  width: 110px;
+  padding: 6px 10px;
+  border: 1px solid #dcdfe6;
+  border-radius: 5px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.editor-param-input:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.15);
+}
+.editor-param-input.invalid {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.12);
+}
+
+.editor-param-range { font-size: 12px; color: #7f8c8d; white-space: nowrap; }
+.editor-param-desc { font-size: 12px; color: #7f8c8d; }
+.editor-param-error { display: block; font-size: 12px; color: #e74c3c; margin-top: 4px; min-height: 14px; }
+
+/* ===== CLI 原始区 / 操作日志 ===== */
+.editor-raw, .editor-log {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.editor-raw summary, .editor-log summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #5d6d7e;
+  user-select: none;
+}
+.editor-raw-pre {
+  margin-top: 10px;
+  padding: 12px;
+  background: #1e272e;
+  color: #d3dae0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  line-height: 1.5;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre;
+}
+.editor-log-list {
+  margin-top: 10px;
+  max-height: 260px;
+  overflow: auto;
+  font-size: 12px;
+  color: #5d6d7e;
+  line-height: 1.9;
+}
+.editor-log-item time { color: #95a5a6; margin-right: 8px; font-family: monospace; }
+
+/* ===== 二次确认弹窗 ===== */
+.editor-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.editor-confirm-dialog {
+  background: #fff;
+  border-radius: 10px;
+  width: min(480px, calc(100vw - 48px));
+  padding: 22px 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+.editor-confirm-title { font-size: 17px; font-weight: 600; margin-bottom: 12px; }
+.editor-confirm-message { font-size: 13px; color: #5d6d7e; line-height: 1.8; white-space: pre-line; }
+.editor-confirm-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 640px) {
+  .editor-header { flex-direction: column; align-items: stretch; }
+  .editor-header-actions { justify-content: flex-end; }
+  .editor-param-input { width: 90px; }
+  .editor-param-desc { display: none; }
+}
