@@ -11,6 +11,8 @@ export class ConfigList {
    * 构造函数
    * @param {HTMLElement} container - 列表容器元素
    * @param {object} options - 配置选项
+   * @param {function} options.onEditParams - 参数编辑回调
+   * @param {function} options.onScript - 脚本页回调（单入口：查看/编辑页内切换）
    * @param {function} options.onWrite - 写入飞控回调
    * @param {function} options.onRename - 改名回调
    * @param {function} options.onDelete - 删除回调
@@ -59,6 +61,32 @@ export class ConfigList {
 
     const actions = document.createElement('div');
     actions.className = 'bf-plugin-list-item-actions';
+
+    // 参数编辑按钮（弹窗内在线编辑参数）
+    const editParamsBtn = document.createElement('button');
+    editParamsBtn.className = 'bf-plugin-list-item-action edit-params';
+    editParamsBtn.textContent = '参数编辑';
+    editParamsBtn.style.color = '#3498db';
+    editParamsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.options.onEditParams) {
+        this.options.onEditParams(config);
+      }
+    });
+    actions.appendChild(editParamsBtn);
+
+    // 脚本按钮（单入口：进入脚本页，页内按创建者权限切换查看/编辑模式）
+    const scriptBtn = document.createElement('button');
+    scriptBtn.className = 'bf-plugin-list-item-action script';
+    scriptBtn.textContent = '脚本';
+    scriptBtn.style.color = '#16a085';
+    scriptBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.options.onScript) {
+        this.options.onScript(config);
+      }
+    });
+    actions.appendChild(scriptBtn);
 
     // 写入飞控按钮
     const writeBtn = document.createElement('button');

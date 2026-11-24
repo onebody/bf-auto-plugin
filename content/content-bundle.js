@@ -1,5 +1,5 @@
 (() => {
-  // shared/message-protocol.js
+  // bf-auto-plugin/shared/message-protocol.js
   var MessageTarget = {
     POPUP: "popup",
     BACKGROUND: "background",
@@ -32,7 +32,7 @@
     DATA_CLEAR: "data/clear"
   };
 
-  // content/cli-parser.js
+  // bf-auto-plugin/content/cli-parser.js
   function parseCliDump(text) {
     const lines = String(text || "").split(/\r?\n/);
     const sets = {};
@@ -64,6 +64,9 @@
   function num(v) {
     const n = parseFloat(v);
     return Number.isFinite(n) ? n : void 0;
+  }
+  function structuredIdleToCli(value) {
+    return Math.round((Number(value) || 0) * 100);
   }
   var FILTER_KEYS = {
     gyroLp1Static: "gyro_lpf1_static_hz",
@@ -122,42 +125,469 @@
     if (Object.keys(motor).length) out.motor = motor;
     return out;
   }
+  function findCliErrorLines(delta) {
+    return String(delta || "").split(/\r?\n/).map((l) => l.trim()).filter((l) => l && /error|invalid|unknown/i.test(l));
+  }
 
-  // content/bf-web-adapter.js
+  // bf-auto-plugin/editor/param-metadata.js
+  var PID_KEYS = ["p", "i", "dmax", "diff", "f"];
+  var PID_META = {
+    p: {
+      label: "P",
+      cliPrefix: "p",
+      min: 0,
+      max: 200,
+      step: 1,
+      desc: "\u6BD4\u4F8B\u589E\u76CA\uFF0C\u76F4\u63A5\u51B3\u5B9A\u54CD\u5E94\u901F\u5EA6\u4E0E\u6746\u91CF\u8DDF\u624B\u5EA6"
+    },
+    i: {
+      label: "I",
+      cliPrefix: "i",
+      min: 0,
+      max: 200,
+      step: 1,
+      desc: "\u79EF\u5206\u589E\u76CA\uFF0C\u62B5\u6297\u5916\u529B\u4E0E\u91CD\u91CF\u5206\u5E03\u8BEF\u5DEE\u9020\u6210\u7684\u59FF\u6001\u6F02\u79FB"
+    },
+    dmax: {
+      label: "DMax",
+      cliPrefix: "d",
+      min: 0,
+      max: 100,
+      step: 1,
+      desc: "D \u9879\u6700\u5927\u503C\uFF0C\u6291\u5236 propwash \u4E0E\u5FEB\u901F\u673A\u52A8\u7684\u9707\u8361"
+    },
+    diff: {
+      label: "D \u884D\u751F",
+      cliPrefix: "d_min",
+      min: 0,
+      max: 100,
+      step: 1,
+      desc: "D \u9879\u4E0B\u9650\uFF0C\u9632\u6B62\u5FEB\u901F\u53CD\u6253\u65F6 D \u8F93\u51FA\u8DCC\u843D\u8FC7\u6DF1"
+    },
+    f: {
+      label: "F",
+      cliPrefix: "f",
+      min: 0,
+      max: 500,
+      step: 1,
+      desc: "\u524D\u9988\u589E\u76CA\uFF0C\u63D0\u5347\u5FEB\u901F\u6253\u6746\u65F6\u7684\u8DDF\u968F\u6027"
+    }
+  };
+  var RATES_KEYS = ["centerSens", "maxRate", "expo"];
+  var RATES_META = {
+    centerSens: {
+      label: "\u4E2D\u592E\u7075\u654F\u5EA6",
+      cliSuffix: "rc_rate",
+      min: 0,
+      max: 250,
+      step: 1,
+      desc: "\u6447\u6746\u4E2D\u4F4D\u9644\u8FD1\u7684\u7075\u654F\u5EA6\uFF08UI \u503C = CLI rc_rate \xD710\uFF09"
+    },
+    maxRate: {
+      label: "\u6700\u5927\u89D2\u901F\u7387",
+      unit: "\xB0/s",
+      cliSuffix: "srate",
+      min: 0,
+      max: 2e3,
+      step: 10,
+      desc: "\u6EE1\u6746\u65F6\u7684\u89D2\u901F\u7387\u4E0A\u9650\uFF08UI \u503C = CLI srate \xD710\uFF09"
+    },
+    expo: {
+      label: "Expo",
+      cliSuffix: "expo",
+      min: 0,
+      max: 1,
+      step: 0.01,
+      desc: "\u4E2D\u4F4D\u533A\u66F2\u7EBF\u67D4\u548C\u7A0B\u5EA6\uFF0C\u8D8A\u5927\u4E2D\u4F4D\u8D8A\u67D4\u548C"
+    }
+  };
+  var RATES_EXTRA_KEYS = ["throttleLimit", "throttleExpo"];
+  var RATES_EXTRA_META = {
+    throttleLimit: {
+      label: "\u6CB9\u95E8\u9650\u5236",
+      unit: "%",
+      cliName: "throttle_limit_percent",
+      min: 25,
+      max: 150,
+      step: 1,
+      desc: "\u6CB9\u95E8\u8F93\u51FA\u4E0A\u9650\u767E\u5206\u6BD4\uFF0C\u4FDD\u62A4\u7535\u8C03\u4E0E\u7535\u673A"
+    },
+    throttleExpo: {
+      label: "\u6CB9\u95E8 Expo",
+      cliName: "thr_expo",
+      min: 0,
+      max: 1,
+      step: 0.01,
+      desc: "\u6CB9\u95E8\u4E2D\u4F4D\u533A\u67D4\u548C\u7A0B\u5EA6"
+    }
+  };
+  var FILTER_KEYS2 = [
+    "gyroLp1Static",
+    "gyroLp1Dynamic",
+    "gyroLp2Static",
+    "gyroNotchCount",
+    "gyroNotchQ",
+    "gyroNotchMinHz",
+    "gyroNotchMaxHz",
+    "dtermLp1Static",
+    "dtermLp1Dynamic",
+    "dtermLp1Expo",
+    "dtermLp2Static",
+    "yawLpStatic"
+  ];
+  var FILTER_META = {
+    gyroLp1Static: {
+      label: "\u9640\u87BA\u4EEA LP1 \u9759\u6001",
+      unit: "Hz",
+      cliName: "gyro_lpf1_static_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "\u9640\u87BA\u4EEA\u4E00\u9636\u4F4E\u901A\u9759\u6001\u622A\u6B62\u9891\u7387"
+    },
+    gyroLp1Dynamic: {
+      label: "\u9640\u87BA\u4EEA LP1 \u52A8\u6001\u4E0A\u9650",
+      unit: "Hz",
+      cliName: "gyro_lpf1_dyn_max_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "\u52A8\u6001\u4F4E\u901A\u7684\u6700\u9AD8\u622A\u6B62\u9891\u7387\uFF08\u968F\u6CB9\u95E8\u6ED1\u52A8\uFF09"
+    },
+    gyroLp2Static: {
+      label: "\u9640\u87BA\u4EEA LP2 \u9759\u6001",
+      unit: "Hz",
+      cliName: "gyro_lpf2_static_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "\u9640\u87BA\u4EEA\u4E8C\u9636\u4F4E\u901A\u9759\u6001\u622A\u6B62\u9891\u7387"
+    },
+    gyroNotchCount: {
+      label: "\u52A8\u6001\u9677\u6CE2\u5668\u6570\u91CF",
+      cliName: "dyn_notch_count",
+      min: 0,
+      max: 5,
+      step: 1,
+      integer: true,
+      desc: "RPM/FF \u52A8\u6001\u9677\u6CE2\u6EE4\u6CE2\u5668\u7EA7\u6570"
+    },
+    gyroNotchQ: {
+      label: "\u52A8\u6001\u9677\u6CE2 Q \u503C",
+      cliName: "dyn_notch_q",
+      min: 1,
+      max: 500,
+      step: 1,
+      integer: true,
+      desc: "\u9677\u6CE2\u5668\u54C1\u8D28\u56E0\u6570\uFF0C\u8D8A\u9AD8\u6EE4\u6CE2\u7A97\u53E3\u8D8A\u7A84\uFF08CLI \u9ED8\u8BA4 300\uFF09"
+    },
+    gyroNotchMinHz: {
+      label: "\u52A8\u6001\u9677\u6CE2\u4E0B\u9650",
+      unit: "Hz",
+      cliName: "dyn_notch_min_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "\u52A8\u6001\u9677\u6CE2\u6700\u4F4E\u4E2D\u5FC3\u9891\u7387"
+    },
+    gyroNotchMaxHz: {
+      label: "\u52A8\u6001\u9677\u6CE2\u4E0A\u9650",
+      unit: "Hz",
+      cliName: "dyn_notch_max_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "\u52A8\u6001\u9677\u6CE2\u6700\u9AD8\u4E2D\u5FC3\u9891\u7387"
+    },
+    dtermLp1Static: {
+      label: "D \u9879 LP1 \u9759\u6001",
+      unit: "Hz",
+      cliName: "dterm_lpf1_static_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "D \u9879\u4E00\u9636\u4F4E\u901A\u9759\u6001\u622A\u6B62\u9891\u7387"
+    },
+    dtermLp1Dynamic: {
+      label: "D \u9879 LP1 \u52A8\u6001\u4E0A\u9650",
+      unit: "Hz",
+      cliName: "dterm_lpf1_dyn_max_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "D \u9879\u52A8\u6001\u4F4E\u901A\u7684\u6700\u9AD8\u622A\u6B62\u9891\u7387"
+    },
+    dtermLp1Expo: {
+      label: "D \u9879 LP1 Expo",
+      cliName: "dterm_lpf1_dyn_expo",
+      min: 0,
+      max: 10,
+      step: 1,
+      integer: true,
+      desc: "D \u9879\u52A8\u6001\u4F4E\u901A\u66F2\u7EBF\u6307\u6570\uFF08CLI \u9ED8\u8BA4 5\uFF09"
+    },
+    dtermLp2Static: {
+      label: "D \u9879 LP2 \u9759\u6001",
+      unit: "Hz",
+      cliName: "dterm_lpf2_static_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "D \u9879\u4E8C\u9636\u4F4E\u901A\u9759\u6001\u622A\u6B62\u9891\u7387"
+    },
+    yawLpStatic: {
+      label: "\u504F\u822A\u4F4E\u901A",
+      unit: "Hz",
+      cliName: "yaw_lowpass_hz",
+      min: 0,
+      max: 1e3,
+      step: 1,
+      desc: "\u504F\u822A\u8F74\u4F4E\u901A\u6EE4\u6CE2\u622A\u6B62\u9891\u7387"
+    }
+  };
+  var MOTOR_KEYS = [
+    "throttleBoost",
+    "motorOutputLimit",
+    "dynamicIdle",
+    "vbatSagComp",
+    "thrustLinearization",
+    "motorIdle"
+  ];
+  var MOTOR_META = {
+    throttleBoost: {
+      label: "\u6CB9\u95E8\u52A0\u901F",
+      unit: "%",
+      cliName: "throttle_boost",
+      min: 0,
+      max: 100,
+      step: 1,
+      desc: "\u5FEB\u901F\u63A8\u6CB9\u95E8\u65F6\u7684\u54CD\u5E94\u52A0\u6210"
+    },
+    motorOutputLimit: {
+      label: "\u7535\u673A\u8F93\u51FA\u9650\u5236",
+      unit: "%",
+      cliName: "motor_output_limit",
+      min: 25,
+      max: 100,
+      step: 1,
+      desc: "\u9650\u5236\u7535\u673A\u6700\u5927\u8F93\u51FA\u529F\u7387\uFF0C\u4FDD\u62A4\u52A8\u529B\u7CFB\u7EDF"
+    },
+    dynamicIdle: {
+      label: "\u52A8\u6001\u6020\u901F",
+      unit: "RPM",
+      cliName: "dyn_idle_min_rpm",
+      min: 0,
+      max: 1e4,
+      step: 100,
+      desc: "\u52A8\u6001\u6020\u901F\u7684\u6700\u4F4E\u8F6C\u901F"
+    },
+    vbatSagComp: {
+      label: "\u538B\u964D\u8865\u507F",
+      unit: "%",
+      cliName: "vbat_sag_compensation",
+      min: 0,
+      max: 150,
+      step: 1,
+      desc: "\u7535\u6C60\u7535\u538B\u8DCC\u843D\u65F6\u7684\u8865\u507F\u5F3A\u5EA6"
+    },
+    thrustLinearization: {
+      label: "\u63A8\u529B\u7EBF\u6027\u5316",
+      unit: "%",
+      cliName: "thrust_linear",
+      min: 0,
+      max: 48,
+      step: 1,
+      desc: "\u63A8\u529B\u8F93\u51FA\u66F2\u7EBF\u7EBF\u6027\u5316\u7A0B\u5EA6\uFF0C\u6539\u5584\u6CB9\u95E8\u7EBF\u6027\u611F"
+    },
+    motorIdle: {
+      label: "\u7535\u673A\u6020\u901F",
+      cliName: "dshot_idle_value\uFF08\xF7100\uFF09",
+      min: 0,
+      max: 10,
+      step: 0.1,
+      desc: "\u7535\u673A\u6020\u901F\u5360\u7A7A\u6BD4\uFF08UI \u503C = CLI dshot_idle_value \xF7100\uFF09"
+    }
+  };
+  var SECTION_TITLES = {
+    pid: "PID \u8C03\u53C2",
+    rates: "Rates \u4E0E\u6CB9\u95E8",
+    filter: "\u6EE4\u6CE2\u5668",
+    motor: "\u6CB9\u95E8\u548C\u7535\u673A\u8BBE\u7F6E"
+  };
+  function inferPrecision(meta) {
+    const stepStr = String(meta.step ?? 1);
+    const dot = stepStr.indexOf(".");
+    return dot === -1 ? 0 : stepStr.length - dot - 1;
+  }
+  function validateParamValue(rawValue, meta) {
+    const s = String(rawValue ?? "").trim();
+    if (!s) {
+      return { ok: false, error: "\u503C\u4E0D\u80FD\u4E3A\u7A7A" };
+    }
+    const n = Number(s);
+    if (!Number.isFinite(n)) {
+      return { ok: false, error: "\u5FC5\u987B\u662F\u6570\u5B57" };
+    }
+    if (meta.integer && !Number.isInteger(n)) {
+      return { ok: false, error: "\u5FC5\u987B\u662F\u6574\u6570" };
+    }
+    if (n < meta.min || n > meta.max) {
+      return { ok: false, error: `\u8D85\u51FA\u8303\u56F4 ${meta.min}\u2013${meta.max}` };
+    }
+    const p = inferPrecision(meta);
+    const value = p > 0 ? Math.round(n * 10 ** p) / 10 ** p : Math.round(n);
+    return { ok: true, value };
+  }
+  var RATE_UI_SCALE = 10;
+  var EXPO_UI_SCALE = 100;
+  var CLI_MAP = (() => {
+    const map = {};
+    for (const axis of ["roll", "pitch", "yaw"]) {
+      for (const k of PID_KEYS) {
+        map[`${PID_META[k].cliPrefix}_${axis}`] = { section: "pid", key: k, axis };
+      }
+      for (const k of RATES_KEYS) {
+        const scaled = k === "centerSens" || k === "maxRate";
+        const expo = k === "expo";
+        map[`${axis}_${RATES_META[k].cliSuffix}`] = {
+          section: "rates",
+          key: k,
+          axis,
+          toUi: scaled ? (v) => v * RATE_UI_SCALE : expo ? (v) => v / EXPO_UI_SCALE : void 0,
+          toCli: scaled ? (v) => v / RATE_UI_SCALE : expo ? (v) => Math.round(v * EXPO_UI_SCALE) : void 0
+        };
+      }
+    }
+    for (const k of RATES_EXTRA_KEYS) {
+      const expo = k === "throttleExpo";
+      map[RATES_EXTRA_META[k].cliName] = {
+        section: "rates",
+        key: k,
+        ...expo ? { toUi: (v) => v / EXPO_UI_SCALE, toCli: (v) => Math.round(v * EXPO_UI_SCALE) } : {}
+      };
+    }
+    for (const k of FILTER_KEYS2) {
+      map[FILTER_META[k].cliName] = { section: "filter", key: k };
+    }
+    for (const k of MOTOR_KEYS) {
+      map[k === "motorIdle" ? "dshot_idle_value" : MOTOR_META[k].cliName] = k === "motorIdle" ? { section: "motor", key: k, toUi: (v) => v / 100, toCli: structuredIdleToCli } : { section: "motor", key: k };
+    }
+    return map;
+  })();
+  function metaOf(def) {
+    if (def.axis) return def.section === "pid" ? PID_META[def.key] : RATES_META[def.key];
+    if (def.section === "rates") return RATES_EXTRA_META[def.key];
+    if (def.section === "filter") return FILTER_META[def.key];
+    return MOTOR_META[def.key];
+  }
+  function fmtCliValue(v) {
+    return String(Number(Number(v).toFixed(4)));
+  }
+  function structuredToSets(structured) {
+    const out = {};
+    const s = structured || {};
+    for (const [name, def] of Object.entries(CLI_MAP)) {
+      let v;
+      if (def.axis) v = s[def.section]?.[def.axis]?.[def.key];
+      else v = s[def.section]?.[def.key];
+      if (v === void 0 || v === null || v === "") continue;
+      out[name] = def.toCli ? def.toCli(Number(v)) : Number(v);
+    }
+    return out;
+  }
+  function structuredToScript(structured) {
+    const sets = structuredToSets(structured);
+    const lines = ["# \u7531\u53C2\u6570\u7F16\u8F91\u5668\u81EA\u52A8\u751F\u6210\uFF08CLI \u503C\u57DF\uFF0C\u53EF\u76F4\u63A5\u7C98\u8D34\u5230 Betaflight CLI \u6267\u884C\uFF09"];
+    for (const sec of ["pid", "rates", "filter", "motor"]) {
+      const names = Object.keys(sets).filter((n) => CLI_MAP[n].section === sec);
+      if (!names.length) continue;
+      lines.push(`# ---- ${SECTION_TITLES[sec]} ----`);
+      for (const n of names) lines.push(`set ${n} = ${fmtCliValue(sets[n])}`);
+    }
+    const extra = structured && structured.extra && typeof structured.extra === "object" ? Object.entries(structured.extra).filter(([, v]) => v !== void 0 && v !== null && v !== "") : [];
+    if (extra.length) {
+      lines.push("# ---- \u5176\u4ED6\u53C2\u6570 ----");
+      for (const [n, v] of extra) lines.push(`set ${n} = ${v}`);
+    }
+    return lines.join("\n") + "\n";
+  }
+  function parseParamScript(text) {
+    const sets = {};
+    const unknown = [];
+    String(text || "").split(/\r?\n/).forEach((raw, i) => {
+      const line = raw.trim();
+      if (!line || line.startsWith("#")) return;
+      const m = line.match(/^set\s+(\S+)\s*=\s*(.+)$/);
+      if (!m) return;
+      const name = m[1];
+      if (CLI_MAP[name]) sets[name] = m[2].trim();
+      else unknown.push({ line: i + 1, name, value: m[2].trim() });
+    });
+    return { sets, unknown };
+  }
+  function applyScriptSets(sets, structured) {
+    const applied = [];
+    const failed = [];
+    for (const [name, rawValue] of Object.entries(sets || {})) {
+      const def = CLI_MAP[name];
+      if (!def) {
+        failed.push({ name, value: rawValue, reason: "\u672A\u8BC6\u522B\u7684\u53C2\u6570" });
+        continue;
+      }
+      const parsed = parseFloat(rawValue);
+      const uiRaw = def.toUi ? def.toUi(parsed) : parsed;
+      const r = validateParamValue(uiRaw, metaOf(def));
+      if (!r.ok) {
+        failed.push({ name, value: rawValue, reason: r.error });
+        continue;
+      }
+      if (def.axis) {
+        structured[def.section] = structured[def.section] || {};
+        structured[def.section][def.axis] = structured[def.section][def.axis] || {};
+        structured[def.section][def.axis][def.key] = r.value;
+      } else {
+        structured[def.section] = structured[def.section] || {};
+        structured[def.section][def.key] = r.value;
+      }
+      applied.push(name);
+    }
+    return { applied, failed };
+  }
+  function structuredToWriteCommands(structured) {
+    const extra = structured && structured.extra && typeof structured.extra === "object" ? Object.entries(structured.extra).filter(([n, v]) => n && v !== void 0 && v !== null && v !== "") : [];
+    const extraNames = new Set(extra.map(([n]) => n));
+    const script = structuredToScript(structured);
+    const { sets, unknown } = parseParamScript(script);
+    const realUnknown = unknown.filter((u) => !extraNames.has(u.name));
+    if (realUnknown.length) {
+      const u = realUnknown[0];
+      throw new Error(`\u672A\u8BC6\u522B\u7684 CLI \u53C2\u6570: ${u.name}\uFF08\u811A\u672C\u7B2C ${u.line} \u884C\uFF09`);
+    }
+    const { failed } = applyScriptSets(sets, {});
+    if (failed.length) {
+      const f = failed[0];
+      throw new Error(`\u53C2\u6570\u6821\u9A8C\u5931\u8D25: ${f.name} = ${f.value}\uFF08${f.reason}\uFF09`);
+    }
+    const commands = String(script).split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+    const names = Object.keys(sets);
+    const secSet = /* @__PURE__ */ new Set();
+    for (const n of names) secSet.add(CLI_MAP[n].section);
+    if (extraNames.size) {
+      const extraInScript = commands.map((l) => l.match(/^set\s+(\S+)\s*=/)).filter(Boolean).map((m) => m[1]).filter((n) => extraNames.has(n));
+      for (const n of extraInScript) names.push(n);
+      secSet.add("extra");
+    }
+    return { commands, names, sections: [...secSet] };
+  }
+
+  // bf-auto-plugin/content/bf-web-adapter.js
   var PAGE_TEXT = {
     navPid: ["PID \u8C03\u53C2", "PID Tuning"],
-    navMotors: ["\u7535\u673A", "Motors"],
     navCli: ["\u547D\u4EE4\u884C", "CLI"],
-    subPid: ["PID \u914D\u7F6E\u6587\u4EF6\u8BBE\u7F6E", "PID profile settings"],
-    subRates: ["Rate \u914D\u7F6E\u6587\u4EF6\u8BBE\u7F6E", "Rate profile settings"],
-    subFilter: ["\u6EE4\u6CE2\u5668\u8BBE\u7F6E", "Filter settings"],
-    save: ["\u4FDD\u5B58", "Save"],
-    saveConfirm: ["\u786E\u8BA4", "\u786E\u5B9A", "\u597D", "OK", "Continue", "\u7EE7\u7EED", "\u91CD\u65B0\u542F\u52A8", "Restart"],
     cliClear: ["\u6E05\u9664\u8F93\u51FA\u5386\u53F2\u8BB0\u5F55", "Clear output history"]
   };
-  var PID_AXIS = { roll: /^ROLL$/i, pitch: /^PITCH$/i, yaw: /^YAW$/i };
-  var RATES_AXIS = { roll: /^横滚/, pitch: /^俯仰/, yaw: /^方向/ };
-  var PID_COLS = 5;
-  var RATES_COLS = 3;
-  var FILTER_INPUTS = 12;
-  var MOTOR_ZONE_INPUTS = 5;
-  var TEXT_MOTOR_ZONE = "\u6CB9\u95E8\u548C\u7535\u673A\u8BBE\u7F6E";
-  var TEXT_FILTER_GYRO = "\u9640\u87BA\u4EEA\u4F4E\u901A\u6EE4\u6CE2\u5668";
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-  function num2(v) {
-    const n = parseFloat(v);
-    return Number.isFinite(n) ? n : 0;
-  }
-  function visibleLeaves() {
-    return [...document.querySelectorAll("*")].filter((e) => e.children.length === 0 && e.offsetParent !== null);
-  }
-  function findLeafByText(text) {
-    return visibleLeaves().find((e) => e.textContent.trim() === text) || null;
-  }
-  function findLeafByRegex(re) {
-    return visibleLeaves().find((e) => re.test(e.textContent.trim())) || null;
   }
   function findVisibleButton(texts) {
     const candidates = texts.map((t) => t.toLowerCase());
@@ -175,46 +605,6 @@
     btn.dispatchEvent(new MouseEvent("mouseup", opts));
     btn.dispatchEvent(new MouseEvent("click", opts));
   }
-  async function setCellValue(inp, val) {
-    inp.scrollIntoView({ block: "center" });
-    inp.focus();
-    inp.value = String(val);
-    inp.dispatchEvent(new Event("input", { bubbles: true }));
-    inp.dispatchEvent(new Event("change", { bubbles: true }));
-    inp.blur();
-    await sleep(50);
-  }
-  function cellOf(leaf, grid) {
-    let n = leaf;
-    while (n && n.parentElement !== grid) n = n.parentElement;
-    return n;
-  }
-  function rowInputs(grid, axisRegex, count) {
-    const leaf = [...grid.querySelectorAll("*")].find((e) => e.children.length === 0 && axisRegex.test(e.textContent.trim()));
-    if (!leaf) throw new Error("\u8868\u683C\u8F74\u6807\u7B7E\u672A\u627E\u5230: " + axisRegex);
-    const cell = cellOf(leaf, grid);
-    if (!cell) throw new Error("\u8F74\u6807\u7B7E\u5355\u5143\u683C\u5B9A\u4F4D\u5931\u8D25");
-    const inputs = [];
-    let sib = cell.nextElementSibling;
-    while (sib && inputs.length < count) {
-      const inp = sib.querySelector("input");
-      if (!inp) throw new Error("\u8F74\u884C\u5355\u5143\u683C\u7F3A\u5C11\u8F93\u5165\u6846");
-      inputs.push(inp);
-      sib = sib.nextElementSibling;
-    }
-    if (inputs.length < count) {
-      throw new Error(`\u8F74\u884C\u8F93\u5165\u6846\u6570\u91CF\u4E0D\u8DB3: ${inputs.length}/${count}`);
-    }
-    return inputs;
-  }
-  function containerWithInputs(leaf, expectedInputs, maxLevels = 8) {
-    let c = leaf.parentElement;
-    for (let i = 0; i < maxLevels && c; i++) {
-      if (c.querySelectorAll("input").length === expectedInputs) return c;
-      c = c.parentElement;
-    }
-    return null;
-  }
   async function clickNav(texts, label) {
     const btn = findVisibleButton(texts);
     if (!btn) throw new Error(`\u5DE6\u4FA7\u83DC\u5355\u672A\u627E\u5230\u300C${label}\u300D\u5165\u53E3`);
@@ -223,269 +613,6 @@
   }
   async function ensurePidPage() {
     await clickNav(PAGE_TEXT.navPid, "PID \u8C03\u53C2");
-  }
-  async function navigateToMotors() {
-    await clickNav(PAGE_TEXT.navMotors, "\u7535\u673A");
-  }
-  async function switchSubTab(name) {
-    const map = { pid: PAGE_TEXT.subPid, rates: PAGE_TEXT.subRates, filter: PAGE_TEXT.subFilter };
-    const texts = map[name];
-    if (!texts) throw new Error("\u672A\u77E5\u5B50\u9875\u7B7E: " + name);
-    const btn = findVisibleButton(texts);
-    if (!btn) throw new Error(`\u5B50\u9875\u7B7E\u6309\u94AE\u672A\u627E\u5230: ${texts[0]}`);
-    pressButton(btn);
-    await sleep(800);
-  }
-  async function tryClickSave() {
-    const btn = findVisibleButton(PAGE_TEXT.save);
-    if (!btn) return false;
-    pressButton(btn);
-    await sleep(1e3);
-    const dlgBtn = [...document.querySelectorAll("button")].find((b) => b.offsetParent !== null && PAGE_TEXT.saveConfirm.includes(b.textContent.trim()));
-    if (dlgBtn) {
-      pressButton(dlgBtn);
-      await sleep(500);
-    }
-    return true;
-  }
-  async function selectDropdownOption(trigger, label) {
-    pressButton(trigger);
-    await sleep(800);
-    const opt = [...document.querySelectorAll('[role="option"]')].find((o) => o.offsetParent !== null && o.textContent.trim() === label);
-    if (!opt) throw new Error(`\u4E0B\u62C9\u9009\u9879\u672A\u627E\u5230: ${label}`);
-    opt.focus();
-    opt.dispatchEvent(new KeyboardEvent("keydown", {
-      key: "Enter",
-      keyCode: 13,
-      bubbles: true,
-      cancelable: true
-    }));
-    await sleep(600);
-  }
-  async function ensurePidEditable() {
-    const grid = pidGrid();
-    const disabledCount = [...grid.querySelectorAll("input")].filter((i) => i.disabled).length;
-    if (!disabledCount) return;
-    const blockLeaf = visibleLeaves().find((e) => e.textContent.trim() === "PID \u8C03\u53C2\u6ED1\u5757");
-    if (!blockLeaf) throw new Error("PID \u8868\u88AB\u6ED1\u5757\u6A21\u5F0F\u9501\u5B9A\uFF0C\u4E14\u672A\u627E\u5230\u300CPID \u8C03\u53C2\u6ED1\u5757\u300D\u533A\u5757");
-    let block = blockLeaf.parentElement;
-    for (let i = 0; i < 6 && block; i++) {
-      if (block.textContent.includes("\u6A21\u5F0F")) break;
-      block = block.parentElement;
-    }
-    const trigger = [...block.querySelectorAll("button")].find((b) => b.offsetParent !== null && ["RP", "RPY", "\u5173\u95ED"].includes(b.textContent.trim()));
-    if (!trigger) throw new Error("\u672A\u627E\u5230\u6ED1\u5757\u6A21\u5F0F\u4E0B\u62C9\u89E6\u53D1\u5668");
-    await selectDropdownOption(trigger, "\u5173\u95ED");
-    const still = [...pidGrid().querySelectorAll("input")].filter((i) => i.disabled).length;
-    if (still) throw new Error(`\u6ED1\u5757\u6A21\u5F0F\u5173\u95ED\u5931\u8D25\uFF0CPID \u8868\u4ECD\u6709 ${still} \u4E2A\u7981\u7528\u8F93\u5165\u6846`);
-  }
-  function pidGrid() {
-    const leaf = findLeafByRegex(PID_AXIS.roll);
-    if (!leaf) throw new Error("PID \u8868 ROLL \u6807\u7B7E\u672A\u627E\u5230");
-    const g = leaf.closest(".grid");
-    if (!g) throw new Error("PID \u8868 grid \u5BB9\u5668\u672A\u627E\u5230");
-    return g;
-  }
-  async function writePidTable(pid) {
-    const grid = pidGrid();
-    for (const [axis, re] of Object.entries(PID_AXIS)) {
-      const a = pid[axis];
-      if (!a || typeof a !== "object") continue;
-      const inputs = rowInputs(grid, re, PID_COLS);
-      const vals = [
-        a.p ?? a.P,
-        a.i ?? a.I,
-        a.dmax ?? a.dMax ?? a.DMax,
-        a.diff ?? a.d ?? a.D,
-        a.f ?? a.F
-      ];
-      for (let i = 0; i < PID_COLS; i++) {
-        if (vals[i] === void 0) continue;
-        await setCellValue(inputs[i], vals[i]);
-      }
-    }
-  }
-  function ratesGrid() {
-    const leaf = findLeafByRegex(RATES_AXIS.roll);
-    if (!leaf) throw new Error("Rates \u8868\u300C\u6A2A\u6EDA\u300D\u6807\u7B7E\u672A\u627E\u5230");
-    const g = leaf.closest(".grid");
-    if (!g) throw new Error("Rates \u8868 grid \u5BB9\u5668\u672A\u627E\u5230");
-    return g;
-  }
-  function throttleInputs() {
-    const leaf = findLeafByText("\u6CB9\u95E8\u9650\u5236");
-    if (leaf) {
-      let c = leaf.parentElement;
-      for (let i = 0; i < 6 && c; i++) {
-        const inputs = [...c.querySelectorAll("input")].filter((x) => x.offsetParent !== null);
-        if (inputs.length === 3) return inputs;
-        c = c.parentElement;
-      }
-    }
-    const all = [...document.querySelectorAll("input")].filter((i) => i.offsetParent !== null);
-    if (all.length >= 3) return all.slice(-3);
-    throw new Error("\u6CB9\u95E8\u9650\u5236\u533A\u5757\u672A\u627E\u5230");
-  }
-  async function writeRatesTable(rates) {
-    const r = rates || {};
-    const grid = ratesGrid();
-    for (const [axis, re] of Object.entries(RATES_AXIS)) {
-      const a = r[axis];
-      if (!a || typeof a !== "object") continue;
-      const inputs = rowInputs(grid, re, RATES_COLS);
-      const vals = [
-        a.centerSens ?? a.rcRate,
-        a.maxRate ?? a.superRate,
-        a.expo
-      ];
-      for (let i = 0; i < RATES_COLS; i++) {
-        if (vals[i] === void 0) continue;
-        await setCellValue(inputs[i], vals[i]);
-      }
-    }
-    const t = throttleInputs();
-    if (r.throttleLimit !== void 0) await setCellValue(t[0], r.throttleLimit);
-    if (r.throttleMidPoint !== void 0) await setCellValue(t[1], r.throttleMidPoint);
-    if (r.throttleExpo !== void 0) await setCellValue(t[2], r.throttleExpo);
-  }
-  function filterGrid() {
-    const leaf = findLeafByText(TEXT_FILTER_GYRO);
-    if (!leaf) throw new Error("\u6EE4\u6CE2\u5668\u300C\u9640\u87BA\u4EEA\u4F4E\u901A\u6EE4\u6CE2\u5668\u300D\u6807\u9898\u672A\u627E\u5230");
-    const grid = containerWithInputs(leaf, FILTER_INPUTS);
-    if (!grid) throw new Error(`\u6EE4\u6CE2\u5668\u53CC\u5217\u5BB9\u5668\uFF08${FILTER_INPUTS} inputs\uFF09\u672A\u627E\u5230`);
-    return grid;
-  }
-  async function writeFilterBlocks(filter) {
-    const f = filter || {};
-    const grid = filterGrid();
-    const inputs = [...grid.querySelectorAll("input")];
-    if (inputs.length !== FILTER_INPUTS) {
-      throw new Error(`\u6EE4\u6CE2\u5668\u5BB9\u5668\u9884\u671F ${FILTER_INPUTS} \u4E2A\u8F93\u5165\u6846\uFF0C\u5B9E\u9645 ${inputs.length}`);
-    }
-    const vals = [
-      f.gyroLp1Static,
-      f.gyroLp1Dynamic,
-      f.gyroLp2Static,
-      f.gyroNotchCount,
-      f.gyroNotchQ,
-      f.gyroNotchMinHz,
-      f.gyroNotchMaxHz,
-      f.dtermLp1Static,
-      f.dtermLp1Dynamic,
-      f.dtermLp1Expo,
-      f.dtermLp2Static,
-      f.yawLpStatic
-    ];
-    for (let i = 0; i < FILTER_INPUTS; i++) {
-      if (vals[i] === void 0) continue;
-      await setCellValue(inputs[i], vals[i]);
-    }
-  }
-  function motorZoneEl() {
-    const leaf = findLeafByText(TEXT_MOTOR_ZONE);
-    if (!leaf) throw new Error(`\u300C${TEXT_MOTOR_ZONE}\u300D\u6807\u9898\u672A\u627E\u5230`);
-    const el = containerWithInputs(leaf, MOTOR_ZONE_INPUTS, 6);
-    if (!el) throw new Error(`\u300C${TEXT_MOTOR_ZONE}\u300D\u533A\u5757\uFF08${MOTOR_ZONE_INPUTS} inputs\uFF09\u672A\u627E\u5230`);
-    return el;
-  }
-  async function writeMotorZone(motor) {
-    const m = motor || {};
-    const el = motorZoneEl();
-    const inputs = [...el.querySelectorAll("input")];
-    if (inputs.length !== MOTOR_ZONE_INPUTS) {
-      throw new Error(`\u300C${TEXT_MOTOR_ZONE}\u300D\u9884\u671F ${MOTOR_ZONE_INPUTS} \u4E2A\u8F93\u5165\u6846\uFF0C\u5B9E\u9645 ${inputs.length}`);
-    }
-    const vals = [m.throttleBoost, m.motorOutputLimit, m.dynamicIdle, m.vbatSagComp, m.thrustLinearization];
-    for (let i = 0; i < MOTOR_ZONE_INPUTS; i++) {
-      if (vals[i] === void 0) continue;
-      await setCellValue(inputs[i], vals[i]);
-    }
-  }
-  function motorIdleInput() {
-    const inputs = [...document.querySelectorAll("input")].filter((i) => i.offsetParent !== null);
-    if (inputs.length !== 1) {
-      throw new Error(`\u7535\u673A\u9875\u9884\u671F\u552F\u4E00\u6020\u901F\u8F93\u5165\u6846\uFF0C\u5B9E\u9645 ${inputs.length} \u4E2A`);
-    }
-    return inputs[0];
-  }
-  async function tryClickMotorSave() {
-    const btn = [...document.querySelectorAll("button")].find((b) => b.offsetParent !== null && /^(保存并重启|保存|Save and Restart|Save)$/i.test(b.textContent.trim()));
-    if (!btn) return false;
-    pressButton(btn);
-    await sleep(1e3);
-    const dlgBtn = [...document.querySelectorAll("button")].find((b) => b.offsetParent !== null && PAGE_TEXT.saveConfirm.includes(b.textContent.trim()));
-    if (dlgBtn) {
-      pressButton(dlgBtn);
-      await sleep(500);
-    }
-    return true;
-  }
-  async function writeMotorIdle(value) {
-    await navigateToMotors();
-    const inp = motorIdleInput();
-    if (inp.disabled) {
-      throw new Error("\u7535\u673A\u6020\u901F\u8F93\u5165\u6846\u88AB\u9875\u9762\u7981\u7528\uFF0C\u65E0\u6CD5\u5199\u5165");
-    }
-    await setCellValue(inp, value);
-    if (num2(inp.value) !== num2(value)) {
-      throw new Error(`\u7535\u673A\u6020\u901F\u5199\u5165\u88AB\u56DE\u6EDA\uFF08\u9875\u9762\u663E\u793A ${inp.value}\uFF0C\u671F\u671B ${value}\uFF09`);
-    }
-    const saved = await tryClickMotorSave();
-    try {
-      await ensurePidPage();
-    } catch (e) {
-      console.warn("[BfWebAdapter] \u4FDD\u5B58\u91CD\u542F\u540E\u8FD4\u56DE PID \u9875\u5931\u8D25\uFF08\u9884\u671F\u526F\u4F5C\u7528\uFF09: " + e.message);
-    }
-    return { value, saved };
-  }
-  async function writeAll(params, onProgress) {
-    const p = params || {};
-    const sections = [];
-    const notify = (msg) => {
-      if (onProgress) onProgress(0, 0, msg);
-    };
-    await ensurePidPage();
-    if (p.pid || p.motor && ["throttleBoost", "motorOutputLimit", "dynamicIdle", "vbatSagComp", "thrustLinearization"].some((k) => p.motor && p.motor[k] !== void 0)) {
-      await switchSubTab("pid");
-      if (p.pid) {
-        await ensurePidEditable();
-        notify("\u5199\u5165 PID \u8868...");
-        await writePidTable(p.pid);
-        sections.push("PID\u8868");
-      }
-      if (p.motor && ["throttleBoost", "motorOutputLimit", "dynamicIdle", "vbatSagComp", "thrustLinearization"].some((k) => p.motor[k] !== void 0)) {
-        notify("\u5199\u5165\u6CB9\u95E8\u548C\u7535\u673A\u8BBE\u7F6E...");
-        await writeMotorZone(p.motor);
-        sections.push("\u6CB9\u95E8\u7535\u673A\u8BBE\u7F6E");
-      }
-      notify("\u4FDD\u5B58 PID \u9875...");
-      if (!await tryClickSave()) throw new Error("\u672A\u627E\u5230\u4FDD\u5B58\u6309\u94AE\uFF08PID \u9875\uFF09");
-    }
-    if (p.rates) {
-      await switchSubTab("rates");
-      notify("\u5199\u5165 Rates...");
-      await writeRatesTable(p.rates);
-      sections.push("Rates");
-      notify("\u4FDD\u5B58 Rates \u9875...");
-      if (!await tryClickSave()) throw new Error("\u672A\u627E\u5230\u4FDD\u5B58\u6309\u94AE\uFF08Rates \u9875\uFF09");
-    }
-    if (p.filter) {
-      await switchSubTab("filter");
-      notify("\u5199\u5165\u6EE4\u6CE2\u5668...");
-      await writeFilterBlocks(p.filter);
-      sections.push("\u6EE4\u6CE2\u5668");
-      notify("\u4FDD\u5B58\u6EE4\u6CE2\u5668\u9875...");
-      if (!await tryClickSave()) throw new Error("\u672A\u627E\u5230\u4FDD\u5B58\u6309\u94AE\uFF08\u6EE4\u6CE2\u5668\u9875\uFF09");
-    }
-    if (p.motor && p.motor.motorIdle !== void 0) {
-      notify("\u5199\u5165\u7535\u673A\u6020\u901F...");
-      const r = await writeMotorIdle(p.motor.motorIdle);
-      if (!r.saved) {
-        console.warn("[BfWebAdapter] \u7535\u673A\u9875\u65E0\u4FDD\u5B58\u6309\u94AE\uFF0C\u6020\u901F\u53EF\u80FD\u672A\u6301\u4E45\u5316");
-      }
-      sections.push("\u7535\u673A\u6020\u901F");
-    }
-    return { success: true, message: `\u5DF2\u5199\u5165: ${sections.join(", ")}`, sections, saved: true };
   }
   async function navigateToCli() {
     await clickNav(PAGE_TEXT.navCli, "\u547D\u4EE4\u884C");
@@ -542,6 +669,55 @@
     if (!delta.trim()) throw new Error("CLI \u65E0\u8F93\u51FA\uFF08\u547D\u4EE4\u672A\u6267\u884C\u6216\u98DE\u63A7\u672A\u8FDE\u63A5\uFF09");
     return delta;
   }
+  var SECTION_LABELS = {
+    pid: "PID\u8868",
+    rates: "Rates",
+    filter: "\u6EE4\u6CE2\u5668",
+    motor: "\u6CB9\u95E8/\u7535\u673A\u8BBE\u7F6E"
+  };
+  async function writeAll(params, onProgress) {
+    const p = params || {};
+    const notify = (msg) => {
+      if (onProgress) onProgress(0, 0, msg);
+    };
+    notify("\u751F\u6210 CLI \u5199\u5165\u547D\u4EE4...");
+    const { commands, sections } = structuredToWriteCommands(p);
+    if (!commands.length) {
+      return { success: true, message: "\u65E0\u53EF\u5199\u5165\u53C2\u6570", sections: [], saved: true };
+    }
+    notify("\u8FDB\u5165\u547D\u4EE4\u884C\u9875...");
+    await navigateToCli();
+    notify("\u7B49\u5F85\u547D\u4EE4\u884C\u5C31\u7EEA...");
+    await waitCliReady();
+    await clearCliOutput();
+    const total = commands.length;
+    for (let i = 0; i < total; i++) {
+      const cmd = commands[i];
+      if (onProgress) onProgress(i + 1, total, `\u5199\u5165\u53C2\u6570 (${i + 1}/${total}): ${cmd}`);
+      const delta = await runCliCommand(cmd);
+      const errs = findCliErrorLines(delta);
+      if (errs.length) {
+        throw new Error(`CLI \u62D2\u7EDD\u547D\u4EE4\u300C${cmd}\u300D: ${errs.join(" | ")}`);
+      }
+    }
+    if (onProgress) onProgress(total, total, "\u6267\u884C save \u4FDD\u5B58\uFF08\u98DE\u63A7\u5C06\u91CD\u542F\u65AD\u8FDE\uFF09...");
+    const saveDelta = await runCliCommand("save");
+    const saveErrs = findCliErrorLines(saveDelta);
+    if (saveErrs.length) {
+      throw new Error(`CLI \u62D2\u7EDD\u547D\u4EE4\u300Csave\u300D: ${saveErrs.join(" | ")}`);
+    }
+    try {
+      await ensurePidPage();
+    } catch (e) {
+      console.warn("[BfWebAdapter] save \u91CD\u542F\u540E\u8FD4\u56DE PID \u9875\u5931\u8D25\uFF08\u9884\u671F\u526F\u4F5C\u7528\uFF09: " + e.message);
+    }
+    return {
+      success: true,
+      message: `\u5DF2\u901A\u8FC7 CLI \u5199\u5165 ${total} \u9879\u53C2\u6570\u5E76\u4FDD\u5B58`,
+      sections: sections.map((k) => SECTION_LABELS[k] || k),
+      saved: true
+    };
+  }
   async function exportViaCli(mode = "dump", onStatus) {
     const cmd = mode === "diff" ? "diff" : "dump";
     const notify = (msg) => {
@@ -572,7 +748,7 @@
     };
   }
 
-  // content/parameter-reader.js
+  // bf-auto-plugin/content/parameter-reader.js
   var ParameterReader = {
     /**
      * 导出飞控参数（CLI dump/diff）
@@ -588,7 +764,7 @@
     }
   };
 
-  // content/selectors.js
+  // bf-auto-plugin/content/selectors.js
   var SELECTORS = {
     /**
      * 登录页面选择器
@@ -717,11 +893,11 @@
     }
   };
 
-  // shared/constants.js
+  // bf-auto-plugin/shared/constants.js
   var DEFAULT_TIMEOUT = 5e3;
   var POLL_INTERVAL = 100;
 
-  // content/dom-operator.js
+  // bf-auto-plugin/content/dom-operator.js
   async function waitForElement(selector, timeout = DEFAULT_TIMEOUT) {
     const startTime = Date.now();
     const selectors = selector.split(",").map((s) => s.trim());
@@ -789,7 +965,7 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // content/parameter-writer.js
+  // bf-auto-plugin/content/parameter-writer.js
   var ParameterWriter = {
     /**
      * 写入所有参数（新版 UI 适配层，含保存）
@@ -923,7 +1099,7 @@
     }
   };
 
-  // content/automation-engine.js
+  // bf-auto-plugin/content/automation-engine.js
   var AutomationEngine = {
     /**
      * 执行登录自动化
@@ -1044,7 +1220,7 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // content/content-module.js
+  // bf-auto-plugin/content/content-module.js
   function init() {
     if (window.__BF_CONTENT_LOADED__) {
       console.log("[Content] \u5DF2\u52A0\u8F7D\uFF0C\u8DF3\u8FC7\u91CD\u590D\u6CE8\u5165");

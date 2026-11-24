@@ -24,6 +24,9 @@
  *            油门中点在 BF 4.4 CLI 中无对应参数，不映射（写入时跳过该输入框）
  *   - filter: UI「LP1动态」对应 CLI *_lpf1_dyn_max_hz（非 dyn_min）；偏航LP ← yaw_lowpass_hz
  *   - motor: 电机页怠速 = dshot_idle_value ÷ 100（4↔400、5↔500 经 diff 实证）
+ *
+ * v1.1.0 新增 findCliErrorLines：写入链路（v3.0.0 起 set 命令写入）的统一
+ * 错误行扫描，与 dump/diff 解析同模块保证「读/写共用同一套 CLI 文本处理」。
  */
 
 /**
@@ -62,6 +65,15 @@ export function parseCliDump(text) {
 function num(v) {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * 结构化怠速百分比 → CLI 整数域（dshot_idle_value = % × 100）。
+ * 与 mapToStructured 的 ÷100 严格互逆，读写链共用本函数保证映射对称；
+ * 纯函数导出供 param-metadata（脚本编辑器）与 bf-web-adapter（页面写入）复用。
+ */
+export function structuredIdleToCli(value) {
+  return Math.round((Number(value) || 0) * 100);
 }
 
 /** 滤波器 UI 12 输入框 ↔ CLI 参数名映射（顺序对位） */
@@ -139,4 +151,21 @@ export function mapToStructured(sets) {
   if (Object.keys(filter).length) out.filter = filter;
   if (Object.keys(motor).length) out.motor = motor;
   return out;
+}
+
+/**
+ * 扫描 CLI 输出中的错误行（写入链路统一错误反馈，纯函数可 Node 单测）。
+ * Betaflight CLI 对无效命令/参数/值的返回行均含 Invalid / Unknown / ERROR
+ * 标记（CLI 输出不随固件语言变化），例如：
+ *   Unknown command: foo. Enter 'help' for a list of commands.
+ *   ###ERROR: Invalid value ...###
+ * 成功回显（如 `p_roll set to 45`）与命令回显（`# set ...`）不含上述标记。
+ * @param {string} delta - 单条命令执行后的输出增量（runCliCommand 返回值）
+ * @returns {string[]} 错误行列表（已 trim，保留原文用于错误提示）
+ */
+export function findCliErrorLines(delta) {
+  return String(delta || '')
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l && /error|invalid|unknown/i.test(l));
 }

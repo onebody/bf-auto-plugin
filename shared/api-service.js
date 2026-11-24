@@ -52,6 +52,19 @@ async function clearAccessToken() {
   await chrome.storage.local.remove('access_token');
 }
 
+/**
+ * 本地解析 JWT 过期时间（读 payload.exp，不依赖后端）
+ * 非 JWT 或无法解析时返回 false，交由后端判定
+ */
+function isTokenExpired(token) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload.exp === 'number' && payload.exp * 1000 < Date.now();
+  } catch {
+    return false;
+  }
+}
+
 // 分块 base64 转换：String.fromCharCode(...bytes) 一次传入过大数组会超出
 // JS 引擎参数上限导致栈溢出（配置文件 JSON 可达数十 KB），必须分块处理
 const BASE64_CHUNK_SIZE = 0x8000;
@@ -199,7 +212,9 @@ async function request(url, options = {}) {
   }
 
   const token = await getAccessToken();
-  if (token) {
+  // 公开路径（登录/注册等）不携带 Authorization：避免残留的过期 token
+  // 被附带后，登录接口的「密码错误」401 被误判为「登录已过期」
+  if (token && !isPublicPath) {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
@@ -239,6 +254,11 @@ async function request(url, options = {}) {
   }
 
   if (!response.ok) {
+    // 携带了已过期的 token 仍收到 401：清除失效凭证并统一提示（各模块 catch 可据此恢复登录 UI）
+    if (response.status === 401 && token && isTokenExpired(token)) {
+      await clearAccessToken();
+      throw new Error('登录已过期，请重新登录');
+    }
     throw new Error(data.detail || data.message || `HTTP ${response.status}`);
   }
 
@@ -517,7 +537,7 @@ export const ApiService = {
    */
   async isAuthenticated() {
     const token = await getAccessToken();
-    return !!token;
+    return !!token && !isTokenExpired(token);
   },
 
   /**
@@ -541,7 +561,7 @@ export const ApiService = {
     const token = await getAccessToken();
     const key = await getApiKey();
     return {
-      isAuthenticated: !!token,
+      isAuthenticated: !!token && !isTokenExpired(token),
       hasToken: !!token,
       hasApiKey: !!key
     };

@@ -17,7 +17,6 @@
     <div class="bf-plugin-tabs">
       <button class="bf-plugin-tab active" data-tab="account">账户</button>
       <button class="bf-plugin-tab" data-tab="aircraft">飞机</button>
-      <button class="bf-plugin-tab" data-tab="configs">配置</button>
     </div>
 
     <div class="bf-plugin-content">
@@ -129,15 +128,47 @@
             <div class="bf-plugin-status" id="config-status"></div>
             <div id="config-list-container"></div>
           </div>
-        </div>
-      </div>
 
-      <div class="bf-plugin-tab-content" id="tab-configs">
-        <div class="bf-plugin-section">
-          <div id="config-records-view">
-            <h2 class="bf-plugin-section-title">配置记录管理</h2>
-            <div class="bf-plugin-status" id="config-records-status"></div>
-            <div id="config-records-container"></div>
+          <!-- 脚本页（配置条目单一入口：默认查看模式，页内切换编辑模式，编辑需创建者权限） -->
+          <div id="script-view" style="display:none;">
+            <div class="bf-plugin-list-header">
+              <div class="bf-plugin-header-left">
+                <button class="bf-plugin-button small" id="btn-back-to-config">← 返回</button>
+                <h3 class="bf-plugin-sub-title" id="script-view-title">脚本</h3>
+              </div>
+              <div class="bf-plugin-header-actions">
+                <button class="bf-plugin-button small" id="btn-toggle-versions" style="display:none;">版本历史</button>
+                <button class="bf-plugin-button primary small" id="btn-toggle-script-mode" style="display:none;">编辑模式</button>
+              </div>
+            </div>
+            <div class="bf-plugin-script-meta" id="script-view-meta"></div>
+            <div class="bf-plugin-status" id="script-view-status"></div>
+
+            <!-- 查看模式：语法高亮 + 行号 + 内容搜索 -->
+            <div id="script-view-pane">
+              <div class="bf-plugin-script-search">
+                <input type="text" id="script-search-input" class="bf-plugin-input" placeholder="搜索脚本内容...">
+                <span class="bf-plugin-script-search-count" id="script-search-count"></span>
+                <button class="bf-plugin-button small" id="btn-script-search-prev" title="上一个">↑</button>
+                <button class="bf-plugin-button small" id="btn-script-search-next" title="下一个">↓</button>
+              </div>
+              <div class="bf-plugin-code-wrap">
+                <div class="bf-plugin-code-gutter" id="script-view-gutter"></div>
+                <pre class="bf-plugin-code-pre" id="script-view-code"></pre>
+              </div>
+            </div>
+
+            <!-- 编辑模式：在线编辑 + 行级校验 + 自动保存 + 版本历史 -->
+            <div id="script-edit-pane" style="display:none;">
+              <textarea id="script-edit-ta" class="bf-plugin-script-edit-ta" spellcheck="false"></textarea>
+              <div class="bf-plugin-script-editbar"><span id="script-edit-save-state"></span></div>
+              <div class="bf-plugin-script-diag" id="script-edit-diagnostics"></div>
+              <div class="bf-plugin-script-hint">语法：set &lt;参数名&gt; = &lt;值&gt;（CLI 值域，如 set dshot_idle_value = 450 对应 UI 4.5）；# 为注释；未识别的 set 行将透传保存。通过校验的修改会自动保存并生成新版本。</div>
+              <div id="script-versions-panel" style="display:none;">
+                <div class="bf-plugin-versions-title">版本历史</div>
+                <div id="script-versions-list"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

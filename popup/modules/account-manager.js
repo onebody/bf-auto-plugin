@@ -93,6 +93,7 @@ export const AccountManager = {
       if (result.access_token) {
         await chrome.storage.local.set({
           bf_auto_account: {
+            id: result.user?.id,
             phone: result.user?.phone || phone,
             nickname: result.user?.nickname || '',
             role: result.user?.role || 'pilot'

@@ -87,8 +87,9 @@ export const AircraftManager = {
     }
 
     try {
-      // 机库数据未就绪时先加载（用于列表显示机库归属）
-      if (!Array.isArray(this.hangars)) {
+      // 机库数据未就绪时先加载（用于列表显示机库归属）。
+      // 空数组也视为未就绪：未登录时 init 缓存了 []，登录后依赖这里重载机库栏与表单下拉
+      if (!Array.isArray(this.hangars) || this.hangars.length === 0) {
         await this.loadHangars();
       }
 

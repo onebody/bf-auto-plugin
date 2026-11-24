@@ -7,7 +7,6 @@ import { MessageSource, MessageTarget, MessageAction, createMessage } from '../s
 import { AccountManager } from './modules/account-manager.js';
 import { AircraftManager } from './modules/aircraft-manager.js';
 import { ConfigManager } from './modules/config-manager.js';
-import { ConfigRecordsManager } from './modules/config-records-manager.js';
 
 let currentUser = null;
 let pendingTab = null; // 用户登录前尝试访问的Tab
@@ -29,7 +28,6 @@ async function init() {
   AccountManager.init();
   AircraftManager.init();
   ConfigManager.init();
-  ConfigRecordsManager.init();
 
   initFooterButtons();
 
@@ -105,8 +103,6 @@ function initTabs() {
 
       if (targetTab === 'aircraft') {
         handleAircraftTabClick();
-      } else if (targetTab === 'configs') {
-        handleConfigsTabClick();
       }
     });
   });
@@ -140,6 +136,7 @@ async function updateAuthUI() {
 
   updateTabVisibility();
   AircraftManager.setCurrentUser(currentUser);
+  ConfigManager.setCurrentUser(currentUser);
 }
 
 /**
@@ -168,8 +165,6 @@ async function switchToTab(tabName) {
 
   if (tabName === 'aircraft') {
     await handleAircraftTabClick();
-  } else if (tabName === 'configs') {
-    await handleConfigsTabClick();
   }
 }
 
@@ -178,7 +173,7 @@ async function switchToTab(tabName) {
  */
 function updateTabVisibility() {
   const tabs = document.querySelectorAll('.bf-plugin-tab');
-  const footer = document.getElementById('plugin-footer');
+  const footer = document.querySelector('.bf-plugin-footer');
   
   tabs.forEach(tab => {
     const tabName = tab.dataset.tab;
@@ -208,14 +203,6 @@ async function handleAircraftTabClick() {
 
   // 加载设备列表
   await AircraftManager.loadAircrafts();
-}
-
-/**
- * 处理配置 Tab 点击事件（配置记录管理）
- */
-async function handleConfigsTabClick() {
-  console.log('[Popup] 切换到配置 Tab');
-  await ConfigRecordsManager.loadRecords();
 }
 
 /**
@@ -312,16 +299,24 @@ async function handleExportData() {
  * 处理导入数据
  */
 async function handleImportData() {
-  try {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
+    // 异常处理必须包在 async 回调体内：onchange 是异步触发的，
+    // 外层 try/catch 捕获不到本回调中的 JSON.parse 等异常
+    try {
       const text = await file.text();
-      const data = JSON.parse(text);
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        showStatus('aircraft-status', '导入失败: 文件不是有效的 JSON 格式', 'error');
+        return;
+      }
 
       const response = await sendMessageToBackground(MessageAction.DATA_IMPORT, data);
       if (response.success) {
@@ -330,12 +325,12 @@ async function handleImportData() {
       } else {
         showStatus('aircraft-status', `导入失败: ${response.error?.message}`, 'error');
       }
-    };
-    input.click();
-  } catch (error) {
-    console.error('[Popup] 导入数据失败:', error);
-    showStatus('aircraft-status', `导入失败: ${error.message}`, 'error');
-  }
+    } catch (error) {
+      console.error('[Popup] 导入数据失败:', error);
+      showStatus('aircraft-status', `导入失败: ${error.message}`, 'error');
+    }
+  };
+  input.click();
 }
 
 /**
